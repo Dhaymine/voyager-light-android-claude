@@ -425,45 +425,114 @@ object RecordArt {
 }
 
 @Composable
+object RecordArt {
+    /** Engraving in pixel space: disc centre (cx, cy), disc radius r. */
+    fun engraving(cx: Float, cy: Float, r: Float): Path {
+        fun fx(x: Double) = (cx + x * r).toFloat()
+        fun fy(y: Double) = (cy + y * r).toFloat()
+        val p = Path()
+        fun circle(x: Double, y: Double, rad: Double) {
+            p.addOval(Rect(fx(x - rad), fy(y - rad), fx(x + rad), fy(y + rad)))
+        }
+        fun line(vararg c: Double) {
+            var i = 0
+            while (i + 1 < c.size) {
+                if (i == 0) p.moveTo(fx(c[i]), fy(c[i + 1])) else p.lineTo(fx(c[i]), fy(c[i + 1]))
+                i += 2
+            }
+        }
+        fun arc(x: Double, y: Double, rad: Double, a0: Double, a1: Double) {
+            for (i in 0..8) {
+                val a = (a0 + (a1 - a0) * i / 8.0) * PI / 180.0
+                val px = fx(x + rad * cos(a))
+                val py = fy(y + rad * sin(a))
+                if (i == 0) p.moveTo(px, py) else p.lineTo(px, py)
+            }
+        }
+
+        circle(-0.42, -0.40, 0.30)
+        circle(-0.42, -0.40, 0.10)
+        circle(-0.42, -0.40, 0.03)
+        for (k in 0 until 18) arc(-0.42, -0.40, 0.36, k * 20.0, k * 20.0 + 13.0)
+        val rays = listOf(
+            0.0 to 0.55, 25.0 to 0.36, 50.0 to 0.30, 75.0 to 0.30, 100.0 to 0.26,
+            125.0 to 0.25, 155.0 to 0.26, 180.0 to 0.28, 205.0 to 0.30, 235.0 to 0.34,
+            262.0 to 0.28, 285.0 to 0.38, 315.0 to 0.60
+        )
+        for ((a, l) in rays) {
+            val rad = a * PI / 180.0
+            line(-0.42, 0.52, -0.42 + l * cos(rad), 0.52 + l * sin(rad))
+        }
+        val wave = ArrayList<Double>()
+        for (i in 0 until 31) {
+            wave.add(0.02 + i * 0.02)
+            wave.add(-0.46 - 0.08 * abs(sin(i * 0.9 + 0.3)))
+        }
+        line(*wave.toDoubleArray())
+        line(0.06, -0.14, 0.16, 0.0, 0.19, -0.16, 0.30, 0.0, 0.33, -0.16, 0.44, 0.0, 0.47, -0.14)
+        line(0.12, 0.14, 0.46, 0.14, 0.46, 0.34, 0.12, 0.34, 0.12, 0.14)
+        for (i in 0 until 6) {
+            val x = 0.12 + i * 0.012
+            line(x, 0.14, x, 0.34)
+        }
+        line(0.12, 0.38, 0.46, 0.38, 0.46, 0.62, 0.12, 0.62, 0.12, 0.38)
+        circle(0.29, 0.50, 0.09)
+        circle(0.22, 0.80, 0.07)
+        circle(0.45, 0.80, 0.07)
+        line(0.29, 0.80, 0.38, 0.80)
+        line(-0.80, 0.04, -0.30, 0.04)
+        line(-0.34, -0.03, -0.28, -0.03, -0.28, 0.04, -0.34, 0.04, -0.34, -0.03)
+        for (i in 0 until 5) {
+            val y = 0.10 + i * 0.03
+            line(-0.55, y, -0.30, y)
+        }
+        return p
+    }
+}
+
+@Composable
 fun GoldenRecord(modifier: Modifier = Modifier) {
     Canvas(modifier) {
-        val r = size.minDimension / 2f
-        withTransform({
-            translate(size.width / 2f, size.height / 2f)
-            scale(r, r, Offset.Zero)
-        }) {
-            val disc = RecordArt.circle(0.0, 0.0, 1.0)
-            drawPath(
-                disc,
+        val c = center
+        val r = size.minDimension / 2f * 0.98f
+        val discPath = Path().apply { addOval(Rect(c, r)) }
+        val lightGold = Color(0xFFFDE39C)
+        clipPath(discPath) {
+            drawCircle(
                 Brush.radialGradient(
                     0f to Color(0xFF2E1C0A),
                     0.45f to Color(0xFF69441A),
                     0.85f to Color(0xFFB08038),
                     1f to Color(0xFF785221),
-                    center = Offset.Zero, radius = 1f
-                )
+                    center = c, radius = r
+                ),
+                radius = r, center = c
             )
-            drawPath(
-                disc,
+            drawCircle(
                 Brush.linearGradient(
                     listOf(Color.White.copy(alpha = 0.18f), Color.Transparent, Color.Black.copy(alpha = 0.25f)),
-                    start = Offset(0.7f, -0.7f), end = Offset(-0.7f, 0.7f)
-                )
+                    start = Offset(c.x + 0.7f * r, c.y - 0.7f * r),
+                    end = Offset(c.x - 0.7f * r, c.y + 0.7f * r)
+                ),
+                radius = r, center = c
             )
             for (i in 0 until 14) {
-                drawPath(
-                    RecordArt.circle(0.0, 0.0, 0.22 + i * 0.052),
-                    Color.Black.copy(alpha = 0.16f), style = Stroke(0.004f)
+                drawCircle(
+                    Color.Black.copy(alpha = 0.16f),
+                    radius = r * (0.22f + i * 0.052f), center = c, style = Stroke(1f)
                 )
             }
-            val lightGold = Color(0xFFFDE39C)
             drawPath(
-                RecordArt.engraving, lightGold.copy(alpha = 0.92f),
-                style = Stroke(width = 0.014f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+                RecordArt.engraving(c.x, c.y, r),
+                lightGold.copy(alpha = 0.92f),
+                style = Stroke(width = r * 0.014f, cap = StrokeCap.Round, join = StrokeJoin.Round)
             )
-            drawPath(disc, Color(0xFFFFD682).copy(alpha = 0.6f), style = Stroke(0.01f))
-            drawPath(RecordArt.circle(0.0, 0.0, 0.035), Color(0xFF0A0502))
-            drawPath(RecordArt.circle(0.0, 0.0, 0.035), lightGold, style = Stroke(0.007f))
+            drawCircle(
+                Color(0xFFFFD682).copy(alpha = 0.6f),
+                radius = r - r * 0.005f, center = c, style = Stroke(r * 0.01f)
+            )
+            drawCircle(Color(0xFF0A0502), radius = r * 0.035f, center = c)
+            drawCircle(lightGold, radius = r * 0.035f, center = c, style = Stroke(r * 0.007f))
         }
     }
 }

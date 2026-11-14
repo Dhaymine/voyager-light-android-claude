@@ -51,8 +51,8 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -355,76 +355,9 @@ fun FitContainer(mode: RatioMode, custom: Float, content: @Composable () -> Unit
 }
 
 // =====================================================================
-// Golden Record drawn in code
+// Golden Record drawn in code (pixel space, clipped to a circle)
 // =====================================================================
 
-object RecordArt {
-    fun circle(x: Double, y: Double, r: Double): Path = Path().apply {
-        addOval(Rect((x - r).toFloat(), (y - r).toFloat(), (x + r).toFloat(), (y + r).toFloat()))
-    }
-
-    fun line(vararg c: Double): Path = Path().apply {
-        var i = 0
-        while (i + 1 < c.size) {
-            if (i == 0) moveTo(c[i].toFloat(), c[i + 1].toFloat()) else lineTo(c[i].toFloat(), c[i + 1].toFloat())
-            i += 2
-        }
-    }
-
-    fun arc(x: Double, y: Double, r: Double, a0: Double, a1: Double): Path {
-        val p = Path()
-        for (i in 0..8) {
-            val a = (a0 + (a1 - a0) * i / 8.0) * PI / 180.0
-            val px = (x + r * cos(a)).toFloat()
-            val py = (y + r * sin(a)).toFloat()
-            if (i == 0) p.moveTo(px, py) else p.lineTo(px, py)
-        }
-        return p
-    }
-
-    val engraving: Path by lazy {
-        val p = Path()
-        p.addPath(circle(-0.42, -0.40, 0.30))
-        p.addPath(circle(-0.42, -0.40, 0.10))
-        p.addPath(circle(-0.42, -0.40, 0.03))
-        for (k in 0 until 18) p.addPath(arc(-0.42, -0.40, 0.36, k * 20.0, k * 20.0 + 13.0))
-        val rays = listOf(
-            0.0 to 0.55, 25.0 to 0.36, 50.0 to 0.30, 75.0 to 0.30, 100.0 to 0.26,
-            125.0 to 0.25, 155.0 to 0.26, 180.0 to 0.28, 205.0 to 0.30, 235.0 to 0.34,
-            262.0 to 0.28, 285.0 to 0.38, 315.0 to 0.60
-        )
-        for ((a, l) in rays) {
-            val rad = a * PI / 180.0
-            p.addPath(line(-0.42, 0.52, -0.42 + l * cos(rad), 0.52 + l * sin(rad)))
-        }
-        val wave = ArrayList<Double>()
-        for (i in 0 until 31) {
-            wave.add(0.02 + i * 0.02)
-            wave.add(-0.46 - 0.08 * abs(sin(i * 0.9 + 0.3)))
-        }
-        p.addPath(line(*wave.toDoubleArray()))
-        p.addPath(line(0.06, -0.14, 0.16, 0.0, 0.19, -0.16, 0.30, 0.0, 0.33, -0.16, 0.44, 0.0, 0.47, -0.14))
-        p.addPath(line(0.12, 0.14, 0.46, 0.14, 0.46, 0.34, 0.12, 0.34, 0.12, 0.14))
-        for (i in 0 until 6) {
-            val x = 0.12 + i * 0.012
-            p.addPath(line(x, 0.14, x, 0.34))
-        }
-        p.addPath(line(0.12, 0.38, 0.46, 0.38, 0.46, 0.62, 0.12, 0.62, 0.12, 0.38))
-        p.addPath(circle(0.29, 0.50, 0.09))
-        p.addPath(circle(0.22, 0.80, 0.07))
-        p.addPath(circle(0.45, 0.80, 0.07))
-        p.addPath(line(0.29, 0.80, 0.38, 0.80))
-        p.addPath(line(-0.80, 0.04, -0.30, 0.04))
-        p.addPath(line(-0.34, -0.03, -0.28, -0.03, -0.28, 0.04, -0.34, 0.04, -0.34, -0.03))
-        for (i in 0 until 5) {
-            val y = 0.10 + i * 0.03
-            p.addPath(line(-0.55, y, -0.30, y))
-        }
-        p
-    }
-}
-
-@Composable
 object RecordArt {
     /** Engraving in pixel space: disc centre (cx, cy), disc radius r. */
     fun engraving(cx: Float, cy: Float, r: Float): Path {

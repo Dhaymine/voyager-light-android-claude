@@ -1,0 +1,109 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Draw app icon (Golden Record)
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install pillow
+          cat > make_icon.py <<'PY'
+          import math, os
+          from PIL import Image, ImageDraw, ImageChops
+          W = 2048
+          R = int(W * 0.44)
+          cx = cy = W // 2
+          img = Image.new("RGB", (W, W), (5, 5, 12))
+          d = ImageDraw.Draw(img)
+          stops = [(0.0, (45, 28, 10)), (0.45, (105, 68, 26)), (0.85, (175, 128, 56)), (1.0, (120, 82, 32))]
+          def col(t):
+              for (t0, c0), (t1, c1) in zip(stops, stops[1:]):
+                  if t <= t1:
+                      u = (t - t0) / (t1 - t0)
+                      return tuple(int(c0[i] + (c1[i] - c0[i]) * u) for i in range(3))
+              return stops[-1][1]
+          for r in range(R, 0, -2):
+              d.ellipse((cx - r, cy - r, cx + r, cy + r), fill=col(r / R))
+          mask = Image.new("L", (W, W), 0)
+          ImageDraw.Draw(mask).ellipse((cx - R, cy - R, cx + R, cy + R), fill=255)
+          g = Image.linear_gradient("L").resize((W, W)).rotate(45, resample=Image.BICUBIC)
+          alpha = ImageChops.multiply(g.point(lambda v: int(v * 0.22)), mask)
+          img.paste(Image.new("RGB", (W, W), (255, 236, 170)), (0, 0), alpha)
+          ov = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+          o = ImageDraw.Draw(ov)
+          for i in range(14):
+              r = int(R * (0.22 + i * 0.052))
+              o.ellipse((cx - r, cy - r, cx + r, cy + r), outline=(60, 38, 12, 40), width=3)
+          LW = int(R * 0.014)
+          LC = (252, 228, 156, 235)
+          def P(x, y): return (cx + x * R, cy + y * R)
+          def poly(pts): o.line([P(*p) for p in pts], fill=LC, width=LW, joint="curve")
+          def circ(x, y, r):
+              px, py = P(x, y); rr = r * R
+              o.ellipse((px - rr, py - rr, px + rr, py + rr), outline=LC, width=LW)
+          def arc(x, y, r, a0, a1):
+              px, py = P(x, y); rr = r * R
+              o.arc((px - rr, py - rr, px + rr, py + rr), a0, a1, fill=LC, width=LW)
+          circ(-0.42, -0.40, 0.30); circ(-0.42, -0.40, 0.10); circ(-0.42, -0.40, 0.03)
+          for k in range(18): arc(-0.42, -0.40, 0.36, k * 20, k * 20 + 13)
+          for a, l in [(0,.55),(25,.36),(50,.30),(75,.30),(100,.26),(125,.25),(155,.26),(180,.28),(205,.30),(235,.34),(262,.28),(285,.38),(315,.60)]:
+              poly([(-0.42, 0.52), (-0.42 + l * math.cos(math.radians(a)), 0.52 + l * math.sin(math.radians(a)))])
+          poly([(0.02 + i * 0.02, -0.46 - 0.08 * abs(math.sin(i * 0.9 + 0.3))) for i in range(31)])
+          poly([(0.06,-0.14),(0.16,0.0),(0.19,-0.16),(0.30,0.0),(0.33,-0.16),(0.44,0.0),(0.47,-0.14)])
+          poly([(0.12,0.14),(0.46,0.14),(0.46,0.34),(0.12,0.34),(0.12,0.14)])
+          for i in range(6): poly([(0.12 + i * 0.012, 0.14), (0.12 + i * 0.012, 0.34)])
+          poly([(0.12,0.38),(0.46,0.38),(0.46,0.62),(0.12,0.62),(0.12,0.38)])
+          circ(0.29, 0.50, 0.09)
+          circ(0.22, 0.80, 0.07); circ(0.45, 0.80, 0.07); poly([(0.29, 0.80), (0.38, 0.80)])
+          poly([(-0.80, 0.04), (-0.30, 0.04)]); poly([(-0.34,-0.03),(-0.28,-0.03),(-0.28,0.04),(-0.34,0.04),(-0.34,-0.03)])
+          for i in range(5): poly([(-0.55, 0.10 + i * 0.03), (-0.30, 0.10 + i * 0.03)])
+          o.ellipse((cx - R, cy - R, cx + R, cy + R), outline=(255, 215, 130, 150), width=int(R * 0.01))
+          h = int(R * 0.035)
+          o.ellipse((cx - h, cy - h, cx + h, cy + h), fill=(10, 6, 2, 255), outline=LC, width=LW // 2)
+          rgba = Image.alpha_composite(img.convert("RGBA"), ov)
+          rgba.putalpha(mask)
+          res = "app/src/main/res"
+          for p in ("mipmap-xxxhdpi", "drawable-xxxhdpi", "mipmap-anydpi-v26", "values"):
+              os.makedirs(res + "/" + p, exist_ok=True)
+          legacy = Image.new("RGB", (W, W), (5, 5, 12))
+          legacy.paste(rgba, (0, 0), rgba)
+          legacy.resize((192, 192), Image.LANCZOS).save(res + "/mipmap-xxxhdpi/ic_launcher.png")
+          disc = rgba.crop((cx - R, cy - R, cx + R, cy + R)).resize((259, 259), Image.LANCZOS)
+          fg = Image.new("RGBA", (432, 432), (0, 0, 0, 0))
+          fg.paste(disc, ((432 - 259) // 2, (432 - 259) // 2), disc)
+          fg.save(res + "/drawable-xxxhdpi/ic_launcher_foreground.png")
+          open(res + "/values/ic_colors.xml", "w").write('<resources><color name="ic_launcher_background">#05050C</color></resources>')
+          open(res + "/mipmap-anydpi-v26/ic_launcher.xml", "w").write('<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android"><background android:drawable="@color/ic_launcher_background"/><foreground android:drawable="@drawable/ic_launcher_foreground"/></adaptive-icon>')
+          PY
+          .venv/bin/python make_icon.py
+
+      - name: Download font (optional, falls back to system font)
+        run: |
+          mkdir -p app/src/main/assets
+          curl -fsSL -o app/src/main/assets/bold.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Bold.ttf || true
+          curl -fsSL -o app/src/main/assets/medium.ttf https://raw.githubusercontent.com/google/fonts/main/ofl/poppins/Poppins-Medium.ttf || true
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Build debug APK
+        run: gradle assembleDebug --no-daemon
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VoyagerLightDay-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
